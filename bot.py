@@ -368,43 +368,30 @@ async def handle_download(message: Message):
 
 async def main():
 
-    print("STARTING PYROGRAM")
-
     await userbot.start()
 
-    print("PYROGRAM STARTED")
-
-    chat = await userbot.get_chat(
-        STORAGE_CHAT
-    )
+    me = await userbot.get_me()
 
     print(
-        "CONNECTED TO:",
-        chat.title,
-        chat.id
+        "LOGIN:",
+        me.id,
+        me.first_name,
+        me.username
     )
 
-    try:
+    print("=== DIALOGS ===")
 
-        await dp.start_polling(bot)
+    async for dialog in userbot.get_dialogs():
 
-    finally:
+        print(
+            dialog.chat.id,
+            dialog.chat.title,
+            dialog.chat.type
+        )
 
-        await userbot.stop()
+    print("=== END ===")
 
-        me = await userbot.get_me()
-
-        print("LOGIN:")
-        print("ID:", me.id)
-        print("NAME:", me.first_name)
-        print("USERNAME:", me.username)
-
-        async for dialog in userbot.get_dialogs():
-            print(
-                dialog.chat.id,
-                dialog.chat.title,
-                dialog.chat.type
-            )
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
