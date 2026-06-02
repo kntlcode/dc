@@ -173,6 +173,19 @@ async def start(message: Message):
     )
 
 
+@dp.message(Command("uploadtest"))
+async def uploadtest(message: Message):
+
+    uploaded = await userbot.send_document(
+        STORAGE_CHAT,
+        __file__
+    )
+
+    await message.answer(
+        f"OK {uploaded.id}"
+    )
+
+
 @dp.message(Command("test"))
 async def test_storage(message: Message):
 
