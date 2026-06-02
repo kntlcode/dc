@@ -3,8 +3,11 @@ import uuid
 import aiohttp
 import asyncio
 
-from PIL import Image
 from pyrogram import Client, filters
+from pyrogram.types import (
+    InputMediaPhoto,
+    InputMediaVideo
+)
 
 
 API_ID = 36507359
@@ -38,11 +41,15 @@ VIDEO_EXT = {
     ".m4v"
 }
 
+
 app = Client(
     "discord_downloader",
     api_id=API_ID,
     api_hash=API_HASH
 )
+
+
+pending_rename = {}
 
 
 def is_discord_attachment(url: str) -> bool:
@@ -94,23 +101,11 @@ async def download_file(url, filepath):
                     f.write(chunk)
 
 
-@app.on_message(filters.text)
-async def discord_downloader(client, message):
-
-    urls = [
-        line.strip()
-        for line in (message.text or "").splitlines()
-        if line.strip()
-    ]
-
-    urls = [
-        url
-        for url in urls
-        if is_discord_attachment(url)
-    ]
-
-    if not urls:
-        return
+async def process_downloads(
+    message,
+    urls,
+    base_name
+):
 
     status = await message.reply(
         f"⏳ Memproses {len(urls)} file..."
@@ -118,20 +113,38 @@ async def discord_downloader(client, message):
 
     success = 0
 
+    uploaded_media = []
+    all_files = []
+
     for index, url in enumerate(urls, start=1):
 
-        filename = (
+        original_name = (
             url.split("/")[-1]
             .split("?")[0]
         )
 
-        if not filename:
-            filename = "file.bin"
+        ext = os.path.splitext(
+            original_name
+        )[1]
+
+        if len(urls) == 1:
+
+            filename = (
+                f"{base_name}{ext}"
+            )
+
+        else:
+
+            filename = (
+                f"{base_name}_{index:02d}{ext}"
+            )
 
         filepath = os.path.join(
             DOWNLOAD_DIR,
             f"{uuid.uuid4()}_{filename}"
         )
+
+        all_files.append(filepath)
 
         try:
 
@@ -144,62 +157,59 @@ async def discord_downloader(client, message):
                 filepath
             )
 
-            try:
-                img = Image.open(filepath)
-
-                print("IMAGE FORMAT:", img.format)
-                print("IMAGE SIZE:", img.size)
-
-            except Exception as e:
-
-                print("INVALID IMAGE:", e)
-
             media_type = get_media_type(
                 filename
             )
 
-            await status.edit(
-                f"📤 Upload {index}/{len(urls)}"
-            )
-
-            print("FILE EXISTS:", os.path.exists(filepath))
-            print("FILE SIZE:", os.path.getsize(filepath))
-            print("FILEPATH:", filepath)
-            print("MEDIA TYPE:", media_type)
-
-            if media_type == "photo":
-
-                print("START PHOTO UPLOAD")
-
-                await asyncio.wait_for(
-                    message.reply_photo(
-                        photo=filepath,
-                        caption=filename
-                    ),
-                    timeout=60
-                )
-
-                print("PHOTO SENT")
-
-            elif media_type == "video":
-
-                print("START VIDEO UPLOAD")
-
-                await message.reply_video(
-                    video=filepath,
-                    caption=filename,
-                    supports_streaming=True
-                )
-
-                print("VIDEO SENT")
-
-            else:
+            if media_type is None:
 
                 await message.reply(
                     f"❌ Format tidak didukung\n{filename}"
                 )
 
                 continue
+
+            await status.edit(
+                f"📦 Menyiapkan {index}/{len(urls)}"
+            )
+
+            print(
+                "FILE EXISTS:",
+                os.path.exists(filepath)
+            )
+
+            print(
+                "FILE SIZE:",
+                os.path.getsize(filepath)
+            )
+
+            print(
+                "FILEPATH:",
+                filepath
+            )
+
+            print(
+                "MEDIA TYPE:",
+                media_type
+            )
+
+            if media_type == "photo":
+
+                uploaded_media.append(
+                    InputMediaPhoto(
+                        media=filepath,
+                        caption=filename
+                    )
+                )
+
+            elif media_type == "video":
+
+                uploaded_media.append(
+                    InputMediaVideo(
+                        media=filepath,
+                        caption=filename
+                    )
+                )
 
             success += 1
 
@@ -214,17 +224,83 @@ async def discord_downloader(client, message):
                 f"{type(e).__name__}: {e}"
             )
 
-        finally:
+    if uploaded_media:
 
-            try:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-            except:
-                pass
+        await status.edit(
+            "📤 Mengirim album..."
+        )
+
+        for i in range(
+            0,
+            len(uploaded_media),
+            10
+        ):
+
+            chunk = uploaded_media[
+                i:i + 10
+            ]
+
+            await message.reply_media_group(
+                chunk
+            )
+
+    for file in all_files:
+
+        try:
+
+            if os.path.exists(file):
+                os.remove(file)
+
+        except:
+            pass
 
     await status.edit(
         f"✅ Selesai\n"
         f"{success}/{len(urls)} berhasil"
+    )
+
+
+@app.on_message(filters.text)
+async def discord_downloader(client, message):
+
+    user_id = message.from_user.id
+
+    # Sedang menunggu nama file
+    if user_id in pending_rename:
+
+        urls = pending_rename.pop(user_id)
+
+        base_name = message.text.strip()
+
+        await process_downloads(
+            message,
+            urls,
+            base_name
+        )
+
+        return
+
+    # Pesan berisi URL
+    urls = [
+        line.strip()
+        for line in (message.text or "").splitlines()
+        if line.strip()
+    ]
+
+    valid_urls = [
+        url
+        for url in urls
+        if is_discord_attachment(url)
+    ]
+
+    if not valid_urls:
+        return
+
+    pending_rename[user_id] = valid_urls
+
+    await message.reply(
+        f"📦 Ditemukan {len(valid_urls)} file.\n\n"
+        f"Kirim satu nama dasar."
     )
 
 
