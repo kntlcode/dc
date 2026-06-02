@@ -60,7 +60,7 @@ def get_media_type(filename: str):
     if ext in VIDEO_EXT:
         return "video"
 
-    return "document"
+    return None
 
 
 async def download_file(url, filepath):
