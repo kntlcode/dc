@@ -1,15 +1,19 @@
 import os
+import asyncio
+import sys
+
 import uuid
 import asyncio
 import aiohttp
 
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, FSInputFile
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 BOT_TOKEN = "8994808219:AAFpR3xt2leyIcpbKYrOjZ9ZaYdTD-6OHO0"
+OWNER_ID = 940099365
 
 DOWNLOAD_DIR = "downloads"
 CHUNK_SIZE = 1024 * 1024  # 1 MB
@@ -148,121 +152,149 @@ async def start(message: Message):
 
 
 @dp.message()
-async def handle_download(
-    message: Message
-):
+async def handle_download(message: Message):
 
-    url = (
-        message.text or ""
-    ).strip()
+    urls = [
+        line.strip()
+        for line in (message.text or "").splitlines()
+        if line.strip()
+    ]
 
-    if not url.startswith("http"):
-        return
+    valid_urls = [
+        url
+        for url in urls
+        if is_discord_attachment(url)
+    ]
 
-    if not is_discord_attachment(url):
-
+    if not valid_urls:
         return await message.answer(
             "URL Discord tidak valid."
         )
 
     status = await message.answer(
-        "⏳ Memulai download..."
+        f"⏳ Memproses {len(valid_urls)} file..."
     )
 
-    filename = (
-        url.split("/")[-1]
-        .split("?")[0]
-    )
+    success = 0
 
-    if not filename:
-        filename = "file.bin"
+    for index, url in enumerate(valid_urls, start=1):
 
-    filepath = os.path.join(
-        DOWNLOAD_DIR,
-        f"{uuid.uuid4()}_{filename}"
-    )
+        filename = (
+            url.split("/")[-1]
+            .split("?")[0]
+        )
 
-    last_percent = -1
+        if not filename:
+            filename = "file.bin"
 
-    async def progress(
-        percent,
-        downloaded,
-        total
-    ):
-        nonlocal last_percent
-
-        if percent == last_percent:
-            return
-
-        if percent % 5 != 0:
-            return
-
-        last_percent = percent
+        filepath = os.path.join(
+            DOWNLOAD_DIR,
+            f"{uuid.uuid4()}_{filename}"
+        )
 
         try:
+
             await status.edit_text(
-                f"⬇️ Downloading...\n"
-                f"{percent}%"
+                f"⬇️ Download {index}/{len(valid_urls)}"
             )
-        except:
-            pass
+
+            await download_stream(
+                url,
+                filepath
+            )
+
+            file = FSInputFile(filepath)
+
+            media_type = get_media_type(
+                filename
+            )
+
+            if media_type == "photo":
+
+                await message.answer_photo(
+                    photo=file,
+                    caption=filename
+                )
+
+                success += 1
+
+            elif media_type == "video":
+
+                await message.answer_video(
+                    video=file,
+                    caption=filename,
+                    supports_streaming=True
+                )
+
+                success += 1
+
+        except Exception as e:
+
+            await message.answer(
+                f"❌ Gagal:\n{filename}\n\n{e}"
+            )
+
+        finally:
+
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+            except:
+                pass
+
+    await status.edit_text(
+        f"✅ Selesai\n"
+        f"Berhasil: {success}/{len(valid_urls)}"
+    )
+
+
+@dp.message(Command("update"))
+async def update_bot(message: Message):
+
+    if message.from_user.id != OWNER_ID:
+        return
+
+    msg = await message.answer(
+        "🔄 Updating..."
+    )
 
     try:
 
-        await download_stream(
-            url,
-            filepath,
-            progress
+        process = await asyncio.create_subprocess_shell(
+            "git pull",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
 
-        await status.edit_text(
-            "📤 Mengirim ke Telegram..."
+        stdout, stderr = await process.communicate()
+
+        output = (
+            stdout.decode() +
+            stderr.decode()
         )
 
-        file = FSInputFile(filepath)
+        if not output:
+            output = "No output"
 
-        media_type = get_media_type(
-            filename
+        if len(output) > 3500:
+            output = output[:3500]
+
+        await msg.edit_text(
+            f"<pre>{output}</pre>\n\n♻️ Restarting..."
         )
 
-        if media_type == "photo":
+        await asyncio.sleep(2)
 
-            await message.answer_photo(
-                photo=file,
-                caption=filename
-            )
-
-        elif media_type == "video":
-
-            await message.answer_video(
-                video=file,
-                caption=filename,
-                supports_streaming=True
-            )
-
-        else:
-
-            await message.answer(
-                "❌ File bukan foto atau video."
-            )
-
-        await status.edit_text(
-            "✅ Selesai"
+        os.execv(
+            sys.executable,
+            [sys.executable] + sys.argv
         )
 
     except Exception as e:
 
-        await status.edit_text(
-            f"❌ Error\n<code>{e}</code>"
+        await msg.edit_text(
+            f"❌ {e}"
         )
-
-    finally:
-
-        try:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-        except:
-            pass
 
 
 async def main():
