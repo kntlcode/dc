@@ -219,32 +219,32 @@ async def handle_download(
             "📤 Mengirim ke Telegram..."
         )
 
-    file = FSInputFile(filepath)
+        file = FSInputFile(filepath)
 
-    media_type = get_media_type(
-        filename
-    )
-
-    if media_type == "photo":
-
-        await message.answer_photo(
-            photo=file,
-            caption=filename
+        media_type = get_media_type(
+            filename
         )
 
-    elif media_type == "video":
+        if media_type == "photo":
 
-        await message.answer_video(
-            video=file,
-            caption=filename,
-            supports_streaming=True
-        )
+            await message.answer_photo(
+                photo=file,
+                caption=filename
+            )
 
-    else:
+        elif media_type == "video":
 
-        await message.answer(
-            "❌ File bukan foto atau video."
-        )
+            await message.answer_video(
+                video=file,
+                caption=filename,
+                supports_streaming=True
+            )
+
+        else:
+
+            await message.answer(
+                "❌ File bukan foto atau video."
+            )
 
         await status.edit_text(
             "✅ Selesai"
