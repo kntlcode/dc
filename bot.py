@@ -312,11 +312,6 @@ async def handle_download(message: Message):
             print("FILE EXISTS:", os.path.exists(filepath))
             print("FILEPATH:", filepath)
 
-            if os.path.exists print(
-                "SIZE:",
-                os.path.getsize(filepath)
-            )
-            
             media_type = get_media_type(
                 filename
             )
