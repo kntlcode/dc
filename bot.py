@@ -231,7 +231,7 @@ async def handle_download(message: Message):
         except Exception as e:
 
             await message.answer(
-                f"❌ Gagal:\n{filename}\n\n{e}"
+                f"URL:\n{url}\n\nError:\n{e}"
             )
 
         finally:
