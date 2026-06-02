@@ -392,6 +392,20 @@ async def main():
 
         await userbot.stop()
 
+        me = await userbot.get_me()
+
+        print("LOGIN:")
+        print("ID:", me.id)
+        print("NAME:", me.first_name)
+        print("USERNAME:", me.username)
+
+        async for dialog in userbot.get_dialogs():
+            print(
+                dialog.chat.id,
+                dialog.chat.title,
+                dialog.chat.type
+            )
+
 
 if __name__ == "__main__":
     asyncio.run(main())
