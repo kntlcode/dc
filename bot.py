@@ -5,6 +5,7 @@ import uuid
 import asyncio
 import aiohttp
 import pyrogram
+import traceback
 
 from pyrogram import Client
 from aiogram import Bot, Dispatcher
@@ -164,6 +165,38 @@ async def start(message: Message):
     )
 
 
+@dp.message(Command("test"))
+async def test_storage(message: Message):
+
+    if message.from_user.id != OWNER_ID:
+        return
+
+    try:
+
+        chat = await userbot.get_chat(
+            STORAGE_CHAT
+        )
+
+        uploaded = await userbot.send_message(
+            STORAGE_CHAT,
+            "✅ TEST STORAGE"
+        )
+
+        await message.answer(
+            f"OK\n"
+            f"Group: {chat.title}\n"
+            f"Message ID: {uploaded.id}"
+        )
+
+    except Exception as e:
+
+        traceback.print_exc()
+
+        await message.answer(
+            f"<pre>{type(e).__name__}: {e}</pre>"
+        )
+
+
 @dp.message(Command("update"))
 async def update_bot(message: Message):
 
@@ -256,9 +289,16 @@ async def handle_download(message: Message):
 
         try:
 
+            print(
+                "SIZE:",
+                os.path.getsize(filepath)
+            )
+
             await status.edit_text(
                 f"⬇️ Download {index}/{len(valid_urls)}"
             )
+
+            print("DOWNLOAD:", url)
 
             await download_stream(
                 url,
@@ -284,6 +324,11 @@ async def handle_download(message: Message):
                     video=filepath,
                     caption=filename,
                     supports_streaming=True
+                )
+
+                print(
+                    "UPLOADED:",
+                    uploaded.id
                 )
 
             else:
@@ -323,7 +368,21 @@ async def handle_download(message: Message):
 
 async def main():
 
+    print("STARTING PYROGRAM")
+
     await userbot.start()
+
+    print("PYROGRAM STARTED")
+
+    chat = await userbot.get_chat(
+        STORAGE_CHAT
+    )
+
+    print(
+        "CONNECTED TO:",
+        chat.title,
+        chat.id
+    )
 
     try:
 
