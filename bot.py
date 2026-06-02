@@ -3,6 +3,7 @@ import uuid
 import aiohttp
 import asyncio
 
+from PIL import Image
 from pyrogram import Client, filters
 
 
@@ -143,6 +144,16 @@ async def discord_downloader(client, message):
                 filepath
             )
 
+            try:
+                img = Image.open(filepath)
+
+                print("IMAGE FORMAT:", img.format)
+                print("IMAGE SIZE:", img.size)
+
+            except Exception as e:
+
+                print("INVALID IMAGE:", e)
+
             media_type = get_media_type(
                 filename
             )
@@ -161,10 +172,9 @@ async def discord_downloader(client, message):
                 print("START PHOTO UPLOAD")
 
                 await asyncio.wait_for(
-                    message.reply_video(
-                        video=filepath,
-                        caption=filename,
-                        supports_streaming=True
+                    message.reply_photo(
+                        photo=filepath,
+                        caption=filename
                     ),
                     timeout=60
                 )
