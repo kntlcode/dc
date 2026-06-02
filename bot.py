@@ -16,6 +16,38 @@ CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+
+PHOTO_EXT = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp"
+}
+
+VIDEO_EXT = {
+    ".mp4",
+    ".mkv",
+    ".mov",
+    ".webm",
+    ".m4v"
+}
+
+
+def get_media_type(filename):
+
+    ext = os.path.splitext(
+        filename
+    )[1].lower()
+
+    if ext in PHOTO_EXT:
+        return "photo"
+
+    if ext in VIDEO_EXT:
+        return "video"
+
+    return None
+
+
 bot = Bot(
     BOT_TOKEN,
     default=DefaultBotProperties(
@@ -187,11 +219,31 @@ async def handle_download(
             "📤 Mengirim ke Telegram..."
         )
 
-        file = FSInputFile(filepath)
+    file = FSInputFile(filepath)
 
-        await message.answer_document(
-            file,
+    media_type = get_media_type(
+        filename
+    )
+
+    if media_type == "photo":
+
+        await message.answer_photo(
+            photo=file,
             caption=filename
+        )
+
+    elif media_type == "video":
+
+        await message.answer_video(
+            video=file,
+            caption=filename,
+            supports_streaming=True
+        )
+
+    else:
+
+        await message.answer(
+            "❌ File bukan foto atau video."
         )
 
         await status.edit_text(
