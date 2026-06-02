@@ -6,6 +6,7 @@ import uuid
 import asyncio
 import aiohttp
 
+from pyrogram import Client
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, FSInputFile
@@ -60,6 +61,18 @@ bot = Bot(
 )
 
 dp = Dispatcher()
+
+
+API_ID = 36507359
+API_HASH = "9968050f79b08b2bfaa7bf84e2943208"
+
+STORAGE_CHAT = -1003987177995
+
+userbot = Client(
+    "storage",
+    api_id=API_ID,
+    api_hash=API_HASH
+)
 
 
 def is_discord_attachment(url: str) -> bool:
@@ -151,6 +164,55 @@ async def start(message: Message):
     )
 
 
+@dp.message(Command("update"))
+async def update_bot(message: Message):
+
+    if message.from_user.id != OWNER_ID:
+        return
+
+    msg = await message.answer(
+        "🔄 Updating..."
+    )
+
+    try:
+
+        process = await asyncio.create_subprocess_shell(
+            "git pull",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        stdout, stderr = await process.communicate()
+
+        output = (
+            stdout.decode() +
+            stderr.decode()
+        )
+
+        if not output:
+            output = "No output"
+
+        if len(output) > 3500:
+            output = output[:3500]
+
+        await msg.edit_text(
+            f"<pre>{output}</pre>\n\n♻️ Restarting..."
+        )
+
+        await asyncio.sleep(2)
+
+        os.execv(
+            sys.executable,
+            [sys.executable] + sys.argv
+        )
+
+    except Exception as e:
+
+        await msg.edit_text(
+            f"❌ {e}"
+        )
+
+
 @dp.message()
 async def handle_download(message: Message):
 
@@ -203,35 +265,46 @@ async def handle_download(message: Message):
                 filepath
             )
 
-            file = FSInputFile(filepath)
-
             media_type = get_media_type(
                 filename
             )
 
             if media_type == "photo":
 
-                await message.answer_photo(
-                    photo=file,
+                uploaded = await userbot.send_photo(
+                    chat_id=STORAGE_CHAT,
+                    photo=filepath,
                     caption=filename
                 )
 
-                success += 1
-
             elif media_type == "video":
 
-                await message.answer_video(
-                    video=file,
+                uploaded = await userbot.send_video(
+                    chat_id=STORAGE_CHAT,
+                    video=filepath,
                     caption=filename,
                     supports_streaming=True
                 )
 
-                success += 1
+            else:
+
+                await message.answer(
+                    f"❌ Format tidak didukung:\n{filename}"
+                )
+                continue
+
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=STORAGE_CHAT,
+                message_id=uploaded.id
+            )
+
+            success += 1
 
         except Exception as e:
 
             await message.answer(
-                f"URL:\n{url}\n\nError:\n{e}"
+                f"❌ Gagal\n{filename}\n\n{e}"
             )
 
         finally:
@@ -248,58 +321,17 @@ async def handle_download(message: Message):
     )
 
 
-@dp.message(Command("update"))
-async def update_bot(message: Message):
+async def main():
 
-    if message.from_user.id != OWNER_ID:
-        return
-
-    msg = await message.answer(
-        "🔄 Updating..."
-    )
+    await userbot.start()
 
     try:
 
-        process = await asyncio.create_subprocess_shell(
-            "git pull",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
+        await dp.start_polling(bot)
 
-        stdout, stderr = await process.communicate()
+    finally:
 
-        output = (
-            stdout.decode() +
-            stderr.decode()
-        )
-
-        if not output:
-            output = "No output"
-
-        if len(output) > 3500:
-            output = output[:3500]
-
-        await msg.edit_text(
-            f"<pre>{output}</pre>\n\n♻️ Restarting..."
-        )
-
-        await asyncio.sleep(2)
-
-        os.execv(
-            sys.executable,
-            [sys.executable] + sys.argv
-        )
-
-    except Exception as e:
-
-        await msg.edit_text(
-            f"❌ {e}"
-        )
-
-
-async def main():
-
-    await dp.start_polling(bot)
+        await userbot.stop()
 
 
 if __name__ == "__main__":
