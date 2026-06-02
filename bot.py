@@ -1,21 +1,13 @@
 import os
-import asyncio
-import sys
 import uuid
-import asyncio
 import aiohttp
-import pyrogram
-import traceback
+import asyncio
 
-from pyrogram import Client
-from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, FSInputFile
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
+from pyrogram import Client, filters
 
-BOT_TOKEN = "8994808219:AAFpR3xt2leyIcpbKYrOjZ9ZaYdTD-6OHO0"
-OWNER_ID = 940099365
+
+API_ID = 36507359
+API_HASH = "9968050f79b08b2bfaa7bf84e2943208"
 
 BASE_DIR = os.path.dirname(
     os.path.abspath(__file__)
@@ -26,10 +18,9 @@ DOWNLOAD_DIR = os.path.join(
     "downloads"
 )
 
-CHUNK_SIZE = 1024 * 1024  # 1 MB
+CHUNK_SIZE = 1024 * 1024
 
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-
 
 PHOTO_EXT = {
     ".jpg",
@@ -46,12 +37,22 @@ VIDEO_EXT = {
     ".m4v"
 }
 
+app = Client(
+    "discord_downloader",
+    api_id=API_ID,
+    api_hash=API_HASH
+)
 
-def get_media_type(filename):
 
-    ext = os.path.splitext(
-        filename
-    )[1].lower()
+def is_discord_attachment(url: str) -> bool:
+    return (
+        "cdn.discordapp.com/attachments/" in url
+        or "media.discordapp.net/attachments/" in url
+    )
+
+
+def get_media_type(filename: str):
+    ext = os.path.splitext(filename)[1].lower()
 
     if ext in PHOTO_EXT:
         return "photo"
@@ -59,64 +60,18 @@ def get_media_type(filename):
     if ext in VIDEO_EXT:
         return "video"
 
-    return None
+    return "document"
 
 
-bot = Bot(
-    BOT_TOKEN,
-    default=DefaultBotProperties(
-        parse_mode=ParseMode.HTML
-    )
-)
-
-dp = Dispatcher()
-
-
-API_ID = 36507359
-API_HASH = "9968050f79b08b2bfaa7bf84e2943208"
-
-STORAGE_CHAT = -1003987177995
-
-userbot = Client(
-    "storage",
-    api_id=API_ID,
-    api_hash=API_HASH
-)
-
-
-def is_discord_attachment(url: str) -> bool:
-    hosts = {
-        "cdn.discordapp.com",
-        "media.discordapp.net"
-    }
-
-    try:
-        from urllib.parse import urlparse
-
-        parsed = urlparse(url)
-
-        return (
-            parsed.scheme in ("http", "https")
-            and parsed.netloc.lower() in hosts
-            and "/attachments/" in parsed.path
-        )
-    except:
-        return False
-
-
-async def download_stream(
-    url: str,
-    filepath: str,
-    progress_callback=None
-):
-
-    timeout = aiohttp.ClientTimeout(
-        total=None
-    )
+async def download_file(url, filepath):
 
     headers = {
         "User-Agent": "Mozilla/5.0"
     }
+
+    timeout = aiohttp.ClientTimeout(
+        total=None
+    )
 
     async with aiohttp.ClientSession(
         timeout=timeout,
@@ -130,15 +85,6 @@ async def download_stream(
                     f"HTTP {resp.status}"
                 )
 
-            total_size = int(
-                resp.headers.get(
-                    "Content-Length",
-                    0
-                )
-            )
-
-            downloaded = 0
-
             with open(filepath, "wb") as f:
 
                 async for chunk in resp.content.iter_chunked(
@@ -146,129 +92,9 @@ async def download_stream(
                 ):
                     f.write(chunk)
 
-                    downloaded += len(chunk)
 
-                    if (
-                        total_size > 0
-                        and progress_callback
-                    ):
-                        percent = int(
-                            downloaded
-                            * 100
-                            / total_size
-                        )
-
-                        await progress_callback(
-                            percent,
-                            downloaded,
-                            total_size
-                        )
-
-
-@dp.message(CommandStart())
-async def start(message: Message):
-
-    await message.answer(
-        "Kirim URL attachment Discord."
-    )
-
-
-@dp.message(Command("uploadtest"))
-async def uploadtest(message: Message):
-
-    uploaded = await userbot.send_document(
-        STORAGE_CHAT,
-        __file__
-    )
-
-    await message.answer(
-        f"OK {uploaded.id}"
-    )
-
-
-@dp.message(Command("test"))
-async def test_storage(message: Message):
-
-    if message.from_user.id != OWNER_ID:
-        return
-
-    try:
-
-        chat = await userbot.get_chat(
-            STORAGE_CHAT
-        )
-
-        uploaded = await userbot.send_message(
-            STORAGE_CHAT,
-            "✅ TEST STORAGE"
-        )
-
-        await message.answer(
-            f"OK\n"
-            f"Group: {chat.title}\n"
-            f"Message ID: {uploaded.id}"
-        )
-
-    except Exception as e:
-
-        traceback.print_exc()
-
-        await message.answer(
-            f"<pre>{type(e).__name__}: {e}</pre>"
-        )
-
-
-@dp.message(Command("update"))
-async def update_bot(message: Message):
-
-    if message.from_user.id != OWNER_ID:
-        return
-
-    msg = await message.answer(
-        "🔄 Updating..."
-    )
-
-    try:
-
-        process = await asyncio.create_subprocess_shell(
-            "git pull",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-
-        stdout, stderr = await process.communicate()
-
-        output = (
-            stdout.decode() +
-            stderr.decode()
-        )
-
-        if not output:
-            output = "No output"
-
-        if len(output) > 3500:
-            output = output[:3500]
-
-        await msg.edit_text(
-            f"<pre>{output}</pre>\n\n♻️ Restarting..."
-        )
-
-        await asyncio.sleep(2)
-
-        os.execv(
-            sys.executable,
-            [sys.executable] + sys.argv
-        )
-
-    except Exception as e:
-
-        await msg.edit_text(
-            f"❌ {e}"
-        )
-
-
-@dp.message()
-async def handle_download(message: Message):
+@app.on_message(filters.text)
+async def discord_downloader(client, message):
 
     urls = [
         line.strip()
@@ -276,24 +102,22 @@ async def handle_download(message: Message):
         if line.strip()
     ]
 
-    valid_urls = [
+    urls = [
         url
         for url in urls
         if is_discord_attachment(url)
     ]
 
-    if not valid_urls:
-        return await message.answer(
-            "URL Discord tidak valid."
-        )
+    if not urls:
+        return
 
-    status = await message.answer(
-        f"⏳ Memproses {len(valid_urls)} file..."
+    status = await message.reply(
+        f"⏳ Memproses {len(urls)} file..."
     )
 
     success = 0
 
-    for index, url in enumerate(valid_urls, start=1):
+    for index, url in enumerate(urls, start=1):
 
         filename = (
             url.split("/")[-1]
@@ -310,77 +134,74 @@ async def handle_download(message: Message):
 
         try:
 
-
-            await status.edit_text(
-                f"⬇️ Download {index}/{len(valid_urls)}"
+            await status.edit(
+                f"⬇️ Download {index}/{len(urls)}"
             )
 
-            print("DOWNLOAD:", url)
-
-            await download_stream(
+            await download_file(
                 url,
                 filepath
             )
-
-            print("FILE EXISTS:", os.path.exists(filepath))
-            print("FILEPATH:", filepath)
 
             media_type = get_media_type(
                 filename
             )
 
-            print("FILENAME:", filename)
+            await status.edit(
+                f"📤 Upload {index}/{len(urls)}"
+            )
+
+            print("FILE EXISTS:", os.path.exists(filepath))
+            print("FILE SIZE:", os.path.getsize(filepath))
+            print("FILEPATH:", filepath)
             print("MEDIA TYPE:", media_type)
 
             if media_type == "photo":
 
                 print("START PHOTO UPLOAD")
 
-                uploaded = await userbot.send_document(
-                    chat_id=STORAGE_CHAT,
-                    document=filepath,
-                    caption=filename
+                await asyncio.wait_for(
+                    message.reply_video(
+                        video=filepath,
+                        caption=filename,
+                        supports_streaming=True
+                    ),
+                    timeout=60
                 )
 
-                print("PHOTO UPLOADED:", uploaded.id)
+                print("PHOTO SENT")
 
             elif media_type == "video":
 
                 print("START VIDEO UPLOAD")
 
-                uploaded = await userbot.send_video(
-                    chat_id=STORAGE_CHAT,
+                await message.reply_video(
                     video=filepath,
                     caption=filename,
                     supports_streaming=True
                 )
 
-                print("VIDEO UPLOADED:", uploaded.id)
+                print("VIDEO SENT")
 
             else:
 
-                print("UNKNOWN TYPE:", filename)
-
-                await message.answer(
-                    f"❌ Format tidak didukung:\n{filename}"
+                await message.reply(
+                    f"❌ Format tidak didukung\n{filename}"
                 )
 
                 continue
-
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=STORAGE_CHAT,
-                message_id=uploaded.id
-            )
 
             success += 1
 
         except Exception as e:
 
+            import traceback
+
             traceback.print_exc()
 
-            await message.answer(
-                f"❌ {type(e).__name__}\n{e}"
+            await message.reply(
+                f"❌ {filename}\n\n"
+                f"{type(e).__name__}: {e}"
             )
 
         finally:
@@ -391,39 +212,10 @@ async def handle_download(message: Message):
             except:
                 pass
 
-    await status.edit_text(
+    await status.edit(
         f"✅ Selesai\n"
-        f"Berhasil: {success}/{len(valid_urls)}"
+        f"{success}/{len(urls)} berhasil"
     )
 
 
-async def main():
-
-    await userbot.start()
-
-    me = await userbot.get_me()
-
-    print(
-        "LOGIN:",
-        me.id,
-        me.first_name,
-        me.username
-    )
-
-    print("=== DIALOGS ===")
-
-    async for dialog in userbot.get_dialogs():
-
-        print(
-            dialog.chat.id,
-            dialog.chat.title,
-            dialog.chat.type
-        )
-
-    print("=== END ===")
-
-    await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+app.run()
