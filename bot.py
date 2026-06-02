@@ -323,9 +323,9 @@ async def handle_download(message: Message):
 
                 print("START PHOTO UPLOAD")
 
-                uploaded = await userbot.send_photo(
+                uploaded = await userbot.send_document(
                     chat_id=STORAGE_CHAT,
-                    photo=filepath,
+                    document=filepath,
                     caption=filename
                 )
 
