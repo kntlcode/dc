@@ -17,7 +17,15 @@ from aiogram.enums import ParseMode
 BOT_TOKEN = "8994808219:AAFpR3xt2leyIcpbKYrOjZ9ZaYdTD-6OHO0"
 OWNER_ID = 940099365
 
-DOWNLOAD_DIR = "downloads"
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
+
+DOWNLOAD_DIR = os.path.join(
+    BASE_DIR,
+    "downloads"
+)
+
 CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
