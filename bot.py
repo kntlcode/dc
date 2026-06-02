@@ -316,7 +316,12 @@ async def handle_download(message: Message):
                 filename
             )
 
+            print("FILENAME:", filename)
+            print("MEDIA TYPE:", media_type)
+
             if media_type == "photo":
+
+                print("START PHOTO UPLOAD")
 
                 uploaded = await userbot.send_photo(
                     chat_id=STORAGE_CHAT,
@@ -324,7 +329,11 @@ async def handle_download(message: Message):
                     caption=filename
                 )
 
+                print("PHOTO UPLOADED:", uploaded.id)
+
             elif media_type == "video":
+
+                print("START VIDEO UPLOAD")
 
                 uploaded = await userbot.send_video(
                     chat_id=STORAGE_CHAT,
@@ -333,16 +342,16 @@ async def handle_download(message: Message):
                     supports_streaming=True
                 )
 
-                print(
-                    "UPLOADED:",
-                    uploaded.id
-                )
+                print("VIDEO UPLOADED:", uploaded.id)
 
             else:
+
+                print("UNKNOWN TYPE:", filename)
 
                 await message.answer(
                     f"❌ Format tidak didukung:\n{filename}"
                 )
+
                 continue
 
             await bot.copy_message(
@@ -355,8 +364,10 @@ async def handle_download(message: Message):
 
         except Exception as e:
 
+            traceback.print_exc()
+
             await message.answer(
-                f"❌ Gagal\n{filename}\n\n{e}"
+                f"❌ {type(e).__name__}\n{e}"
             )
 
         finally:
